@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="kn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HUDKO MASTER PRO - FINAL ADMIN</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+
+    <style>
+        :root { --bg: #0f172a; --card: #1e293b; --acc: #38bdf8; --gold: #fbbf24; --win: #22c55e; --loss: #ef4444; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; margin: 0; padding: 10px; font-size: 13px; }
+        .section-title { background: var(--acc); color: black; padding: 10px; text-align: center; font-weight: bold; margin-top: 15px; border-radius: 5px; text-transform: uppercase; }
+        .card { background: var(--card); border-radius: 10px; padding: 15px; margin-top: 10px; border: 1px solid #334155; }
+        .fin-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px; }
+        .stat-box { background: #020617; padding: 12px; border-radius: 8px; text-align: center; border-bottom: 3px solid var(--acc); }
+        .stat-box b { font-size: 16px; display: block; margin-top: 5px; }
+        .item-list { background: #020617; padding: 10px; border-radius: 8px; margin-top: 5px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #334155; }
+        .btn-sm { padding: 5px 10px; border-radius: 4px; border: none; cursor: pointer; font-size: 10px; font-weight: bold; margin-left: 5px; }
+        .tab-box { display: flex; gap: 5px; margin: 10px 0; overflow-x: auto; padding-bottom: 5px; }
+        .tab { flex: 1; min-width: 85px; padding: 12px; background: #334155; color: white; border: none; border-radius: 4px; font-size: 10px; cursor: pointer; white-space: nowrap; }
+        .tab.active { background: var(--acc); color: black; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+        th, td { padding: 10px; border: 1px solid #334155; text-align: center; }
+        input, select { width: 100%; padding: 12px; margin: 5px 0; border-radius: 5px; background: #020617; color: white; border: 1px solid #475569; box-sizing: border-box; }
+        .btn-main { width: 100%; padding: 15px; background: var(--win); color: black; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .lock-banner { text-align: center; padding: 10px; border-radius: 5px; font-weight: bold; margin-bottom: 10px; border: 1px solid var(--acc); }
+        .status-locked { border-color: var(--loss); color: var(--loss); }
+        .status-open { border-color: var(--win); color: var(--win); }
+        .ai-blink { animation: blink 1.5s infinite; background: rgba(34, 197, 94, 0.2) !important; color: #4ade80 !important; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+    </style>
+</head>
+<body>
+
+    <div id="lockStatus" class="lock-banner status-open">MARKET STATUS: OPEN</div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <b style="color: var(--gold);">HUDKO MASTER ADMIN</b>
+        <input type="date" id="acc_date" style="width: auto; padding: 5px;" onchange="refreshUI()">
+    </div>
+
+    <div class="section-title">💰 ACCOUNTS (TODAY)</div>
+    <div class="card">
+        <div class="fin-grid">
+            <div class="stat-box"><small>Total Biz</small><b id="adm_tot_in" style="color:var(--acc)">₹0</b></div>
+            <div class="stat-box" style="border-bottom-color: var(--gold);"><small>Total Comm</small><b id="adm_tot_comm" style="color:var(--gold)">₹0</b></div>
+            <div class="stat-box" style="border-bottom-color: var(--win);"><small>Win Payout</small><b id="adm_winner_pay" style="color:var(--win)">₹0</b></div>
+            <div class="stat-box" style="border-bottom-color: var(--loss);"><small>Net Profit</small><b id="adm_net_profit" style="color:var(--loss)">₹0</b></div>
+        </div>
+        <div id="agentReportList" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="section-title">⚙️ WIN RATIO & TIME LOCK</div>
+    <div class="card">
+        <div style="display: flex; gap: 5px; align-items: center; margin-bottom: 10px;">
+            <span>Ratio:</span>
+            <input type="number" id="win_ratio_input" style="width: 70px;" onchange="updateSettings()">
+            <small>Open:</small><input type="time" id="t_open" onchange="updateSettings()" style="width: 100px;">
+            <small>Close:</small><input type="time" id="t_close" onchange="updateSettings()" style="width: 100px;">
+        </div>
+    </div>
+
+    <div class="section-title">🎡 MARKET & AGENTS</div>
+    <div class="card">
+        <div style="display: flex; gap: 5px;">
+            <input type="text" id="new_mkt_name" placeholder="Market">
+            <input type="time" id="new_mkt_time">
+            <button class="btn-sm" style="background:var(--acc); color:black" onclick="addMarket()">ADD</button>
+        </div>
+        <div id="market_list_div" style="margin: 10px 0;"></div>
+        <hr style="border: 0.1px solid #334155;">
+        <div style="display: flex; gap: 5px;">
+            <input type="text" id="new_agt_id" placeholder="Agent ID">
+            <input type="number" id="new_agt_comm" placeholder="Comm %">
+            <button class="btn-sm" style="background:var(--acc); color:black" onclick="addAgent()">ADD</button>
+        </div>
+        <div id="agent_list_div" style="margin-top: 10px;"></div>
+    </div>
+
+    <div class="section-title">📊 LOAD ANALYSIS</div>
+    <div class="card">
+        <select id="load_mkt_select" onchange="refreshUI()"></select>
+        <div class="tab-box">
+            <button class="tab active" onclick="setTab('OPEN', this)">OPEN</button>
+            <button class="tab" onclick="setTab('CLOSE', this)">CLOSE</button>
+            <button class="tab" onclick="setTab('JODI', this)">JODI</button>
+            <button class="tab" onclick="setTab('OPEN_PN', this)">OPEN PN</button>
+            <button class="tab" onclick="setTab('CLOSE_PN', this)">CLOSE PN</button>
+        </div>
+        <table>
+            <thead><tr><th>NO</th><th>AMT</th><th>AGENTS</th><th>AI</th></tr></thead>
+            <tbody id="load_body"></tbody>
+        </table>
+    </div>
+
+    <div class="section-title">📢 RESULT PUBLISH</div>
+    <div class="card">
+        <select id="pub_mkt_select"></select>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+            <input type="text" id="p_opn" placeholder="OPEN PANNA">
+            <input type="text" id="p_op" placeholder="OPEN DIGIT">
+            <input type="text" id="p_cl" placeholder="CLOSE DIGIT">
+            <input type="text" id="p_cpn" placeholder="CLOSE PANNA">
+            <input type="text" id="p_jd" style="grid-column: span 2;" placeholder="WINNING JODI">
+        </div>
+        <button class="btn-main" onclick="publishResult()">PUBLISH & UPDATE ACCOUNTS</button>
+    </div>
+
+    <button class="btn-main" style="background:var(--loss); color:white; margin:30px 0;" onclick="resetDay()">RESET TODAY'S DATA</button>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCbVfz8ynzI6WwENNXk9syRXTfq2VdwbLg",
+            authDomain: "manipal-app-270b3.firebaseapp.com",
+            databaseURL: "https://manipal-app-270b3-default-rtdb.firebaseio.com",
+            projectId: "manipal-app-270b3",
+            storageBucket: "manipal-app-270b3.firebasestorage.app",
+            messagingSenderId: "563904839457",
+            appId: "1:563904839457:web:2f88db438d36f37750c860"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let markets = []; let agents = {}; let rawBets = {}; let history = {}; 
+        let settings = {o: "10:00", c: "20:00", ratio: 8}; let curTab = "OPEN";
+
+        db.ref('markets').on('value', snap => { markets = snap.val() || []; refreshUI(); });
+        db.ref('agents').on('value', snap => { agents = snap.val() || {}; refreshUI(); });
+        db.ref('bets').on('value', snap => { rawBets = snap.val() || {}; refreshUI(); });
+        db.ref('history').on('value', snap => { history = snap.val() || {}; refreshUI(); });
+        db.ref('settings').on('value', snap => { 
+            settings = snap.val() || {o: "10:00", c: "20:00", ratio: 8};
+            document.getElementById('t_open').value = settings.o;
+            document.getElementById('t_close').value = settings.c;
+            document.getElementById('win_ratio_input').value = settings.ratio;
+            checkLock();
+        });
+
+        document.getElementById('acc_date').valueAsDate = new Date();
+
+        function updateSettings() {
+            settings.o = document.getElementById('t_open').value;
+            settings.c = document.getElementById('t_close').value;
+            settings.ratio = parseFloat(document.getElementById('win_ratio_input').value);
+            db.ref('settings').set(settings);
+        }
+
+        function checkLock() {
+            let now = new Date();
+            let cur = now.getHours().toString().padStart(2,'0') + ":" + now.getMinutes().toString().padStart(2,'0');
+            let banner = document.getElementById('lockStatus');
+            if(cur >= settings.c) { banner.innerText = "MARKET STATUS: CLOSED"; banner.className = "lock-banner status-locked"; }
+            else { banner.innerText = "MARKET STATUS: OPEN"; banner.className = "lock-banner status-open"; }
+        }
+
+        function addMarket() {
+            let n = document.getElementById('new_mkt_name').value.toUpperCase().trim();
+            let t = document.getElementById('new_mkt_time').value;
+            if(n && t) { markets.push({name: n, time: t}); db.ref('markets').set(markets); }
+        }
+
+        function addAgent() {
+            let id = document.getElementById('new_agt_id').value.toUpperCase().trim();
+            let comm = document.getElementById('new_agt_comm').value || 0;
+            if(id) { agents[id] = parseFloat(comm); db.ref('agents').set(agents); }
+        }
+
+        function refreshUI() {
+            const date = document.getElementById('acc_date').value;
+            const sDate = date.replace(/-0/g, '-');
+            document.getElementById('market_list_div').innerHTML = markets.map((m, i) => `<div class="item-list">${m.name} (${m.time}) <button onclick="markets.splice(${i},1);db.ref('markets').set(markets)">X</button></div>`).join('');
+            let mktOps = markets.map(m => `<option value="${m.name}">${m.name}</option>`).join('');
+            document.getElementById('load_mkt_select').innerHTML = mktOps;
+            document.getElementById('pub_mkt_select').innerHTML = mktOps;
+            document.getElementById('agent_list_div').innerHTML = Object.keys(agents).map(id => `<div class="item-list">${id} (${agents[id]}%) <button onclick="delete agents['${id}'];db.ref('agents').set(agents)">X</button></div>`).join('');
+            let totalIn = 0; let totalComm = 0; let winnerPay = 0;
+            let agtData = {};
+            const betsArray = Object.values(rawBets);
+            const todayRes = Object.values(history).filter(h => h.date === date || h.date === sDate);
+            betsArray.forEach(b => {
+                if(b.date === date || b.date === sDate) {
+                    totalIn += b.amt;
+                    if(!agtData[b.agent]) agtData[b.agent] = 0;
+                    agtData[b.agent] += b.amt;
+                    todayRes.forEach(res => {
+                        if(b.mkt === res.mkt && (b.num === res.jodi || b.num === res.open || b.num === res.close || b.num === res.open_panna || b.num === res.close_panna)) {
+                            winnerPay += (b.amt * settings.ratio);
+                        }
+                    });
+                }
+            });
+            let agtHtml = "";
+            for(let a in agtData) {
+                let comm = (agtData[a] * (agents[a] || 0) / 100);
+                totalComm += comm;
+                agtHtml += `<div class="item-list"><span><b>${a}</b>: ₹${agtData[a]}</span><span>Comm: ₹${comm.toFixed(0)}</span></div>`;
+            }
+            document.getElementById('agentReportList').innerHTML = agtHtml;
+            document.getElementById('adm_tot_in').innerText = "₹" + totalIn;
+            document.getElementById('adm_tot_comm').innerText = "₹" + totalComm.toFixed(0);
+            document.getElementById('adm_winner_pay').innerText = "₹" + winnerPay.toFixed(0);
+            document.getElementById('adm_net_profit').innerText = "₹" + (totalIn - totalComm - winnerPay).toFixed(0);
+            renderLoad(betsArray, date, sDate);
+        }
+
+        function setTab(t, b) {
+            curTab = t;
+            document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+            b.classList.add('active');
+            refreshUI();
+        }
+
+        function renderLoad(betsArray, d1, d2) {
+            const mkt = document.getElementById('load_mkt_select').value;
+            let load = {};
+            let filtered = betsArray.filter(b => {
+                let isDate = (b.date === d1 || b.date === d2);
+                let isMkt = (b.mkt === mkt);
+                let isType = false;
+                if(curTab === 'OPEN') isType = (b.typ === 'OPEN');
+                else if(curTab === 'CLOSE') isType = (b.typ === 'CLOSE');
+                else if(curTab === 'JODI') isType = (b.typ === 'JODI');
+                else if(curTab === 'OPEN_PN') isType = (b.typ === 'OPEN_PANNA' || b.typ === 'OPEN_PN');
+                else if(curTab === 'CLOSE_PN') isType = (b.typ === 'CLOSE_PANNA' || b.typ === 'CLOSE_PN');
+                return isDate && isMkt && isType;
+            });
+            filtered.forEach(b => {
+                if(!load[b.num]) load[b.num] = { total: 0, from: [] };
+                load[b.num].total += b.amt;
+                if(!load[b.num].from.includes(b.agent)) load[b.num].from.push(b.agent);
+            });
+            let html = "";
+            let keys = Object.keys(load).sort();
+            if(keys.length > 0) {
+                keys.forEach(n => {
+                    let d = load[n];
+                    html += `<tr class="${d.total===0?'ai-blink':''}"><td>${n}</td><td>₹${d.total}</td><td>${d.from.join(',')}</td><td>-</td></tr>`;
+                });
+            } else { html = "<tr><td colspan='4'>No data for this selection</td></tr>"; }
+            document.getElementById('load_body').innerHTML = html;
+        }
+
+        function publishResult() {
+            let mkt = document.getElementById('pub_mkt_select').value;
+            let jd = document.getElementById('p_jd').value;
+            if(!jd) return alert("Enter Jodi result!");
+            db.ref('history').push({
+                date: document.getElementById('acc_date').value,
+                mkt: mkt,
+                open_panna: document.getElementById('p_opn').value || "-",
+                open: document.getElementById('p_op').value || "-",
+                close: document.getElementById('p_cl').value || "-",
+                close_panna: document.getElementById('p_cpn').value || "-",
+                jodi: jd
+            }).then(() => { 
+                alert("Result Published!"); 
+                ["p_opn","p_op","p_cl","p_cpn","p_jd"].forEach(id => document.getElementById(id).value = "");
+                refreshUI(); 
+            });
+        }
+
+        function resetDay() { if(confirm("Clear Today's Bets?")) db.ref('bets').set({}); }
+        setInterval(checkLock, 10000);
+    </script>
+</body>
+</html>
